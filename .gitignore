@@ -1,0 +1,29 @@
+# Build outputs and local verification data
+**/bin/
+**/obj/
+/artifacts/
+/Releases/
+/release/
+/temp/
+/test_reports/
+/screenshots/
+
+# Local IDE and agent settings
+/.vs/
+/.vscode/
+/.freebuff/
+/.codex/
+/.agents/
+/AGENTS.md
+*.user
+*.suo
+
+# User data and credentials
+*.db
+*.db-shm
+*.db-wal
+*.log
+.env
+.env.*
+*.pfx
+*.p12

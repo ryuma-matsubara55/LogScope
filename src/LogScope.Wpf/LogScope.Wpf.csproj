@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <StartupObject>LogScope.Wpf.Program</StartupObject>
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <Product>LogScope</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LogScope.Core\LogScope.Core.csproj" />
+    <ProjectReference Include="..\LogScope.Domain\LogScope.Domain.csproj" />
+    <ProjectReference Include="..\LogScope.Sqlite\LogScope.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="WPF-UI" Version="4.2.0" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="distribution.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+  </ItemGroup>
+
+</Project>

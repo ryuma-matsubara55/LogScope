@@ -1,0 +1,53 @@
+<UserControl x:Class="LogScope.Wpf.Views.LogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource ControlBackgroundColor}"
+             Focusable="True"
+             KeyboardNavigation.TabNavigation="None"
+             Loaded="UserControl_Loaded">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="LogViewBackgroundBrush" Color="{DynamicResource ControlBackgroundColor}"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="LineNumberColumn" Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Border x:Name="LineNumberPanel"
+                Grid.Column="0"
+                Background="{DynamicResource LineNumberBackgroundBrush}"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="4,4,6,4">
+            <TextBlock x:Name="LineNumberTextBlock"
+                       FontFamily="{DynamicResource MonospaceFontFamily}"
+                       FontSize="{DynamicResource BodyFontSize}"
+                       Foreground="{DynamicResource SecondaryForegroundBrush}"
+                       TextAlignment="Right"
+                       VerticalAlignment="Top"
+                       Text="1"/>
+        </Border>
+
+        <avalon:TextEditor x:Name="LogEditor"
+                           Grid.Column="1"
+                           BorderThickness="0"
+                           ShowLineNumbers="False"
+                           FontFamily="{DynamicResource MonospaceFontFamily}"
+                           FontSize="{DynamicResource LogFontSize}"
+                           Padding="8,4,16,4"
+                           IsReadOnly="True"
+                           WordWrap="True"
+                           VerticalScrollBarVisibility="Auto"
+                           HorizontalScrollBarVisibility="Auto"
+                           Background="{DynamicResource ControlBackgroundColor}"
+                           Foreground="{DynamicResource PrimaryForegroundBrush}"
+                           LineNumbersForeground="{DynamicResource SecondaryForegroundBrush}"/>
+    </Grid>
+</UserControl>

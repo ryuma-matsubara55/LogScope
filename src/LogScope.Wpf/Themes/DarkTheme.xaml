@@ -1,0 +1,71 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <!-- VS Code / GitHub風ダークテーマ（A案：ハイコントラスト・高情報密度） -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="ControlBackgroundColor" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#252526"/>
+    <SolidColorBrush x:Key="SubPanelBackgroundBrush" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="ControlForegroundBrush" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="PrimaryForegroundBrush" Color="#E1E4E8"/>
+    <SolidColorBrush x:Key="SecondaryForegroundBrush" Color="#8B949E"/>
+    <SolidColorBrush x:Key="TertiaryForegroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="HighlightBackgroundBrush" Color="#2A2D2E"/>
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="#181818"/>
+    <SolidColorBrush x:Key="LineNumberBackgroundBrush" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="LineNumberForegroundBrush" Color="#6E7681"/>
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#333333"/>
+    <SolidColorBrush x:Key="PanelDividerBrush" Color="#30363D"/>
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#30363D"/>
+    <SolidColorBrush x:Key="SelectionBrush" Color="#264F78"/>
+    <SolidColorBrush x:Key="SelectionTextBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="FocusBrush" Color="#007ACC"/>
+    <SolidColorBrush x:Key="SearchHitBackgroundBrush" Color="#515C6A"/>
+    <SolidColorBrush x:Key="SearchHitTextBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#181818"/>
+    <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="#007ACC"/>
+    <SolidColorBrush x:Key="StatusBarForegroundBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="AnnotationCardBackgroundBrush" Color="#252526"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="#F85149"/>
+    <SolidColorBrush x:Key="ErrorBadgeBrush" Color="#DA3633"/>
+    <SolidColorBrush x:Key="WarningBadgeBrush" Color="#D29922"/>
+    <SolidColorBrush x:Key="InfoBadgeBrush" Color="#388BFD"/>
+    <!-- DEBUGバッジ色: 灰色からパープル系に変更し、非アクティブ時の灰色と明確に差別化 -->
+    <SolidColorBrush x:Key="DebugBadgeBrush" Color="#8957E5"/>
+    <SolidColorBrush x:Key="ActiveFilterButtonBrush" Color="#007ACC"/>
+    <SolidColorBrush x:Key="ActiveFilterButtonTextBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="InactiveFilterButtonTextBrush" Color="#8B949E"/>
+
+    <!-- ログレベルトグル非選択（非表示）時の消灯スタイル用ブラシ -->
+    <SolidColorBrush x:Key="InactiveBadgeBackgroundBrush" Color="#21262D"/>
+    <SolidColorBrush x:Key="InactiveBadgeBorderBrush" Color="#30363D"/>
+    <SolidColorBrush x:Key="InactiveBadgeForegroundBrush" Color="#8B949E"/>
+    <SolidColorBrush x:Key="InactiveBadgeDotBrush" Color="#484F58"/>
+
+    <!-- ボタン標準色 -->
+    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="ButtonForegroundBrush" Color="#E1E4E8"/>
+    <SolidColorBrush x:Key="ButtonHoverBackgroundBrush" Color="#3A3D41"/>
+    <SolidColorBrush x:Key="ButtonPressedBackgroundBrush" Color="#1F1F1F"/>
+
+    <!-- AvalonEdit のカラースキーム用参考色 -->
+    <SolidColorBrush x:Key="AvalonBackgroundBrush" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="AvalonLineNumberColor" Color="#6E7681"/>
+    <SolidColorBrush x:Key="AvalonCurrentLineBrush" Color="#282828"/>
+    <SolidColorBrush x:Key="AvalonSelectionBrush" Color="#264F78"/>
+    <SolidColorBrush x:Key="AvalonSelectionTextBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="AvalonErrorBrush" Color="#F85149"/>
+    <SolidColorBrush x:Key="AvalonWarningBrush" Color="#D29922"/>
+    <SolidColorBrush x:Key="AvalonInfoBrush" Color="#388BFD"/>
+    <SolidColorBrush x:Key="AvalonDebugBrush" Color="#8957E5"/>
+
+    <FontFamily x:Key="MonospaceFontFamily">Cascadia Code, Consolas, Courier New</FontFamily>
+    <FontFamily x:Key="BodyFontFamily">Segoe UI Variable Text, Segoe UI, Yu Gothic UI</FontFamily>
+
+    <sys:Double x:Key="BodyFontSize">12</sys:Double>
+    <sys:Double x:Key="LogFontSize">12.5</sys:Double>
+    <sys:Double x:Key="SmallFontSize">11</sys:Double>
+    <sys:Double x:Key="CaptionFontSize">10</sys:Double>
+
+    <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+</ResourceDictionary>

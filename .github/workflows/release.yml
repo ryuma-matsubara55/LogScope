@@ -1,0 +1,59 @@
+name: Windows release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (for example 0.1.1)'
+        required: true
+        type: string
+      publish:
+        description: 'Publish immediately and deliver to installed clients'
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Resolve version and destination
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { $env:REQUESTED_VERSION }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Use a stable x.y.z version.' }
+          $settings = Get-Content src/LogScope.Wpf/distribution.json -Raw | ConvertFrom-Json
+          if ($settings.repositoryUrl -ne "https://github.com/$env:REPOSITORY") { throw 'distribution.json must point to this repository.' }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+      - name: Verify update behavior
+        run: dotnet run --project tools/UpdateVerification -c Release
+      - name: Build installer and update feed
+        shell: pwsh
+        run: ./scripts/Build-Release.ps1 -Version $env:RELEASE_VERSION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LogScope-Windows-${{ env.RELEASE_VERSION }}
+          path: artifacts/releases/${{ env.RELEASE_VERSION }}/*
+      - name: Upload release
+        shell: pwsh
+        env:
+          VPK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+        run: |
+          $publish = $env:GITHUB_REF_TYPE -eq 'tag' -or $env:PUBLISH_REQUESTED -eq 'true'
+          ./scripts/Publish-Release.ps1 -Version $env:RELEASE_VERSION -Publish:$publish

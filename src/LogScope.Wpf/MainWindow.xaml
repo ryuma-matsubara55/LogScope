@@ -1,0 +1,1042 @@
+<local:AppWindow x:Class="LogScope.Wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:LogScope.Wpf"
+        xmlns:vm="clr-namespace:LogScope.Wpf.ViewModels"
+        xmlns:controls="clr-namespace:LogScope.Wpf.Controls"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        Title="LogScope" Height="900" Width="1440"
+        MinHeight="680" MinWidth="1100"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Closing="OnClosing"
+        Loaded="OnLoaded"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="Mica"
+        WindowCornerPreference="Round">
+
+    <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFileCommand}"/>
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveInvestigationCommand}"/>
+        <KeyBinding Gesture="Ctrl+G" Command="{Binding JumpToLineCommand}"/>
+        <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}"/>
+    </Window.InputBindings>
+
+    <Window.Resources>
+        <!-- Compact inputs still need room for the theme's text and padding. -->
+        <Style x:Key="TimeFilterComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="DateFilterPickerStyle" TargetType="DatePicker" BasedOn="{StaticResource {x:Type DatePicker}}">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- 仮想化リスト用のスムーズなコンテナスタイル -->
+        <Style x:Key="LogLineItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryForegroundBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" Padding="0" SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HighlightBackgroundBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ログソース用アイテムスタイル -->
+        <Style x:Key="SourceListItemStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="2,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryForegroundBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="SourceBorder" Background="{DynamicResource SubPanelBackgroundBrush}"
+                                BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
+                                CornerRadius="4" Padding="8,6" SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SourceBorder" Property="Background" Value="{DynamicResource HighlightBackgroundBrush}"/>
+                                <Setter TargetName="SourceBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SourceBorder" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                                <Setter TargetName="SourceBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 検索ヒット項目スタイル -->
+        <Style x:Key="SearchHitItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="HitBorder" Background="{TemplateBinding Background}" CornerRadius="4" Margin="2,1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HitBorder" Property="Background" Value="{DynamicResource HighlightBackgroundBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="HitBorder" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ログレベルバッジ用トグルボタンスタイル（選択時：各カラー点灯、非選択時：ダークグレー消灯） -->
+        <Style x:Key="LevelToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding Background}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Ellipse x:Name="Dot" Width="6" Height="6" Fill="#FFFFFF" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <ContentPresenter x:Name="ContentSite"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  RecognizesAccessKey="True"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- 非選択 (IsChecked=False: 非表示) のとき：消灯ダークグレー＋暗い枠線＋消灯ドット＋グレー文字 -->
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource InactiveBadgeBackgroundBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InactiveBadgeBorderBrush}"/>
+                                <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource InactiveBadgeDotBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource InactiveBadgeForegroundBrush}"/>
+                            </Trigger>
+                            <!-- 非選択時のマウスホバー -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsChecked" Value="False"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="#2D333B"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#444C56"/>
+                                <Setter Property="Foreground" Value="#C9D1D9"/>
+                            </MultiTrigger>
+                            <!-- 選択時のマウスホバー -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsChecked" Value="True"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
+                            </MultiTrigger>
+                            <!-- 無効時は見た目でも判別できるようにする -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.45"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- TitleBar -->
+            <RowDefinition Height="Auto"/>   <!-- ヘッダー・クイックアクションバー -->
+            <RowDefinition Height="*"/>    <!-- メインコンテンツ (3ペイン) -->
+            <RowDefinition Height="26"/>   <!-- ステータスバー -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. WPF-UI 統合タイトルバー -->
+        <ui:TitleBar Grid.Row="0"
+                     Title="LogScope - 大容量ログ分析ワークスペース"
+                     ShowMaximize="True"
+                     ShowMinimize="True"
+                     ShowClose="True"/>
+
+
+        <!-- Investigation actions and search each have a dedicated row. -->
+        <Border Grid.Row="1" Background="{DynamicResource ToolbarBackgroundBrush}" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,0,0,1" Padding="12,6">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Button Content="調査 ▾" Padding="12,5" Margin="0,0,12,0" FontSize="12" AutomationProperties.AutomationId="InvestigationMenu">
+                        <Button.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="新規調査" Command="{Binding NewInvestigationCommand}"/>
+                                <MenuItem Header="調査を開く" Command="{Binding OpenInvestigationCommand}"/>
+                                <MenuItem Header="調査情報を編集" Command="{Binding EditInvestigationCommand}"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding CurrentInvestigationTitle}" TextTrimming="CharacterEllipsis" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip="{Binding InvestigationSaveStatus}"/>
+                        <TextBlock Grid.Column="1" Text="未保存" Margin="12,0" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" Visibility="{Binding IsInvestigationDirty, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    </Grid>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <StackPanel x:Name="UpdatePanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <TextBlock Text="{Binding CurrentVersion, StringFormat=v{0}}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Button Content="{Binding ActionText}" IsEnabled="{Binding CanAct}" ToolTip="{Binding Message}" Click="OnUpdateClick" Padding="12,5" FontSize="12" AutomationProperties.AutomationId="UpdateButton"/>
+                        </StackPanel>
+                        <ui:Button Content="調査を保存" Command="{Binding SaveInvestigationCommand}" Appearance="Secondary" Padding="12,5" Margin="8,0" ToolTip="ログ構成・検索条件・注記を保存します (Ctrl+S)"/>
+                        <ToggleButton Content="使い方" IsChecked="{Binding IsHelpOpen, Mode=TwoWay}" Padding="12,5" FontSize="12" AutomationProperties.AutomationId="HelpToggle"/>
+                    </StackPanel>
+                </Grid>
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <ui:Button Command="{Binding OpenFileCommand}" Content="ログを開く" Appearance="Primary" Padding="14,6" Margin="0,0,12,0" ToolTip="ログファイルを追加します (Ctrl+O)"/>
+                    <Grid x:Name="SearchInputArea" Grid.Column="1" MinWidth="280">
+                        <ui:TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="ログ内のキーワードを検索（Enterで検索）" MinHeight="36" Padding="10,5" VerticalContentAlignment="Center" Icon="Search24" ClearButtonEnabled="True" AutomationProperties.AutomationId="SearchInput" AutomationProperties.Name="ログ内のキーワード検索"/>
+                    </Grid>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                        <ui:Button Content="検索" Command="{Binding SearchCommand}" Appearance="Secondary" Padding="14,5" Margin="0,0,6,0"/>
+                        <ui:Button Content="中止" Command="{Binding CancelSearchCommand}" Appearance="Secondary" Padding="10,5" Margin="0,0,6,0" Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        <ui:Button Content="検索をクリア" Command="{Binding ClearSearchCommand}" Appearance="Transparent" Padding="10,5" Margin="0,0,6,0"/>
+                        <Button Content="検索設定 ▾" Padding="10,5" FontSize="12" AutomationProperties.AutomationId="SearchOptionsMenu">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="正規表現" IsCheckable="True" IsChecked="{Binding UseRegex, Mode=TwoWay}"/>
+                                    <MenuItem Header="一致行のみ表示" IsCheckable="True" IsChecked="{Binding ShowOnlyHits, Mode=TwoWay}" ToolTip="オフの場合は前後のログを残し、一致箇所をハイライトします。"/>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+                <!-- 3. メインワークスペース (3ペイン) -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <!-- 左右ペインを star 比率にして、ウィンドウ/スプリッター操作でフレキシブルに伸縮 -->
+                <ColumnDefinition x:Name="LeftPaneColumn" Width="2*" MinWidth="200"/> <!-- 左ペイン (絞り込みフィルター) -->
+                <ColumnDefinition x:Name="LeftSplitterColumn" Width="Auto"/>              <!-- 左スプリッター -->
+                <ColumnDefinition Width="6*" MinWidth="480"/> <!-- 中央フルエディタ -->
+                <ColumnDefinition x:Name="RightSplitterColumn" Width="Auto"/>              <!-- 右スプリッター -->
+                <ColumnDefinition x:Name="RightPaneColumn" Width="2.4*" MinWidth="240"/> <!-- 右ペイン (詳細/注記) -->
+            </Grid.ColumnDefinitions>
+
+            <!-- A. 左ペイン: ログソース一覧 ＆ 絞り込みフィルター（日時範囲 ＆ ログレベル：常に一致行のみ表示） -->
+            <Border Grid.Column="0"
+                    Visibility="{Binding IsLeftPaneOpen, Converter={StaticResource BoolToVisibilityConverter}}"
+                    Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- ソースヘッダー -->
+                        <RowDefinition Height="120"/>  <!-- ソースリスト -->
+                        <RowDefinition Height="*"/>    <!-- 絞り込みフィルターセクション -->
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Padding="12,10" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <TextBlock Text="ファイル" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource PrimaryForegroundBrush}" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="⋯" Padding="6,2" Margin="0,0,4,0" FontSize="12" ToolTip="ファイルの操作">
+                                    <Button.ContextMenu>
+                                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                            <MenuItem Header="お気に入りをすべて解除" Command="{Binding ClearAllFavoritesCommand}"/>
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                </Button>
+                                <ui:Button Command="{Binding OpenFileCommand}" Appearance="Transparent" Padding="6,2" ToolTip="ファイルを追加">
+                                    <ui:SymbolIcon Symbol="Add24" FontSize="14"/>
+                                </ui:Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- ログソースリスト -->
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Sources}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ItemContainerStyle="{StaticResource SourceListItemStyle}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Padding="6">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <DockPanel LastChildFill="True">
+                                        <CheckBox DockPanel.Dock="Left"
+                                                  IsChecked="{Binding IsIncludedInMergedView, Mode=TwoWay}"
+                                                  IsEnabled="{Binding IsAvailable}"
+                                                  VerticalAlignment="Center"
+                                                  Margin="0,0,5,0"
+                                                  ToolTip="統合ログへの表示を切り替えます"/>
+                                        <ui:Button DockPanel.Dock="Right"
+                                                   Command="{Binding DataContext.ToggleSourceFavoritesOnlyCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                   CommandParameter="{Binding}"
+                                                   IsEnabled="{Binding IsAvailable}"
+                                                   Appearance="Transparent"
+                                                   FontSize="15"
+                                                   Padding="4,0"
+                                                   Margin="4,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip="{Binding FavoritesFilterToolTip}">
+                                            <TextBlock Text="{Binding FavoritesFilterSymbol, StringFormat='{}{0}のみ'}" FontSize="12" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SecondaryForegroundBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowFavoritesOnlyInMergedView}" Value="True">
+                                                            <Setter Property="Foreground" Value="#FFFFD54F"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </ui:Button>
+                                        <ui:Button Command="{Binding DataContext.ActivateSourceCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                   CommandParameter="{Binding}"
+                                                   IsEnabled="{Binding IsAvailable}"
+                                                   Appearance="Transparent"
+                                                   HorizontalContentAlignment="Stretch"
+                                                   Padding="0"
+                                                   ToolTip="{Binding FilePath}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                                <ui:SymbolIcon Symbol="DocumentText24" FontSize="15" Foreground="{DynamicResource InfoBadgeBrush}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource PrimaryForegroundBrush}" TextTrimming="CharacterEllipsis"/>
+                                            </Grid>
+                                        </ui:Button>
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding LineCountText}" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding FilePath}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="12" TextElement.FontSize="12">
+                            <TextBlock Text="絞り込み" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                            <CheckBox Content="同一ログをまとめる" IsChecked="{Binding IsAggregationEnabled, Mode=TwoWay}" Margin="0,0,0,6" AutomationProperties.AutomationId="AggregateLogsToggle" ToolTip="時刻を除いた内容が同じ連続イベントをまとめます。表示設定からも切り替えられます。"/>
+                            <CheckBox Content="同じファイル内だけ" IsChecked="{Binding IncludeSourceInAggregation, Mode=TwoWay}" IsEnabled="{Binding IsAggregationEnabled}" Margin="16,0,0,14" FontSize="12" ToolTip="オンの場合、別ファイルのログはまとめません。"/>
+                                                            <!-- 2. ログレベル絞り込み -->
+                                <TextBlock Text="ログレベル" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource FocusBrush}" Margin="0,0,0,2"/>
+                                <TextBlock Text="変更すると反映されます" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,0,0,4"/>
+                                <UniformGrid Columns="2" Margin="0,0,0,8">
+                                    <ToggleButton Style="{StaticResource LevelToggleStyle}"
+                                                  Background="{DynamicResource InfoBadgeBrush}"
+                                                  IsChecked="{Binding IsInfoActive, Mode=TwoWay}"
+                                                  Content="INFO"
+                                                  ToolTip="INFO/TRACE ログの表示切り替え（点灯: 表示中 / 消灯: 非表示）"/>
+                                    <ToggleButton Style="{StaticResource LevelToggleStyle}"
+                                                  Background="{DynamicResource WarningBadgeBrush}"
+                                                  IsChecked="{Binding IsWarnActive, Mode=TwoWay}"
+                                                  Content="WARN"
+                                                  ToolTip="WARN ログの表示切り替え（点灯: 表示中 / 消灯: 非表示）"/>
+                                    <ToggleButton Style="{StaticResource LevelToggleStyle}"
+                                                  Background="{DynamicResource ErrorBadgeBrush}"
+                                                  IsChecked="{Binding IsErrorActive, Mode=TwoWay}"
+                                                  Content="ERROR"
+                                                  ToolTip="ERROR/FATAL ログの表示切り替え（点灯: 表示中 / 消灯: 非表示）"/>
+                                    <ToggleButton Style="{StaticResource LevelToggleStyle}"
+                                                  Background="{DynamicResource DebugBadgeBrush}"
+                                                  IsChecked="{Binding IsDebugActive, Mode=TwoWay}"
+                                                  Content="DEBUG"
+                                                  ToolTip="DEBUG ログの表示切り替え（点灯: 表示中 / 消灯: 非表示）"/>
+                                </UniformGrid>
+
+                                <!-- フィルター全解除ボタン -->
+                                <ui:Button Content="日時・レベルを解除" Command="{Binding ResetAllFiltersCommand}" Appearance="Transparent" HorizontalAlignment="Stretch" Padding="6,4" Margin="0,0,0,8" FontSize="12"/>
+
+
+                            <CheckBox Content="お気に入りのみ" IsChecked="{Binding ShowOnlyFavorites, Mode=TwoWay}" Margin="0,0,0,14" ToolTip="表示対象のすべてのファイルを、お気に入りログだけに絞り込みます。"/>
+                            <Expander x:Name="DateFilterExpander" Header="日時" IsExpanded="{Binding IsDateFilterExpanded, Mode=TwoWay}" HorizontalContentAlignment="Stretch" FontSize="12">
+                                <StackPanel Margin="0,12,0,0">
+                                                                    <!-- ログ全期間の表示 -->
+                                <Border Background="{DynamicResource SubPanelBackgroundBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="8,5" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="ファイル記録期間:" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}"/>
+                                        <TextBlock Text="{Binding FileTimeRangeText, TargetNullValue='期間不明'}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryForegroundBrush}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 1. 日時範囲フィルター -->
+                                <TextBlock Text="日時で絞り込み" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource FocusBrush}" Margin="0,0,0,4"/>
+
+                                <!-- 開始日時 (From) -->
+                                <TextBlock Text="開始日時" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,0,0,2"/>
+                                <DatePicker Style="{StaticResource DateFilterPickerStyle}" SelectedDate="{Binding FilterFromDate, Mode=TwoWay}"
+                                            Background="{DynamicResource InputBackgroundBrush}"
+                                            Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                            BorderBrush="{DynamicResource ControlBorderBrush}"
+                                            FontSize="12"
+                                            Margin="0,0,0,4"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- 時ドロップダウン -->
+                                    <ComboBox Grid.Column="0" Style="{StaticResource TimeFilterComboBoxStyle}"
+                                              SelectedItem="{Binding FilterFromHour, Mode=TwoWay}"
+                                              Background="{DynamicResource InputBackgroundBrush}"
+                                              Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                              BorderBrush="{DynamicResource ControlBorderBrush}"
+                                              AutomationProperties.Name="開始時刻の時" ToolTip="時 (0〜23)">
+                                        <ComboBox.ItemsSource>
+                                            <x:Array Type="sys:Int32">
+                                                <sys:Int32>0</sys:Int32><sys:Int32>1</sys:Int32><sys:Int32>2</sys:Int32><sys:Int32>3</sys:Int32>
+                                                <sys:Int32>4</sys:Int32><sys:Int32>5</sys:Int32><sys:Int32>6</sys:Int32><sys:Int32>7</sys:Int32>
+                                                <sys:Int32>8</sys:Int32><sys:Int32>9</sys:Int32><sys:Int32>10</sys:Int32><sys:Int32>11</sys:Int32>
+                                                <sys:Int32>12</sys:Int32><sys:Int32>13</sys:Int32><sys:Int32>14</sys:Int32><sys:Int32>15</sys:Int32>
+                                                <sys:Int32>16</sys:Int32><sys:Int32>17</sys:Int32><sys:Int32>18</sys:Int32><sys:Int32>19</sys:Int32>
+                                                <sys:Int32>20</sys:Int32><sys:Int32>21</sys:Int32><sys:Int32>22</sys:Int32><sys:Int32>23</sys:Int32>
+                                            </x:Array>
+                                        </ComboBox.ItemsSource>
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Path=., StringFormat='{}{0:00} 時'}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <!-- 分ドロップダウン -->
+                                    <ComboBox Grid.Column="2" Style="{StaticResource TimeFilterComboBoxStyle}"
+                                              SelectedItem="{Binding FilterFromMinute, Mode=TwoWay}"
+                                              ItemsSource="{Binding FilterMinuteOptions}"
+                                              Background="{DynamicResource InputBackgroundBrush}"
+                                              Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                              BorderBrush="{DynamicResource ControlBorderBrush}"
+                                              AutomationProperties.Name="開始時刻の分" ToolTip="分 (0〜59、1分刻み)">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Path=., StringFormat='{}{0:00} 分'}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+
+                                <!-- 終了日時 (To) -->
+                                <TextBlock Text="終了日時" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,0,0,2"/>
+                                <DatePicker Style="{StaticResource DateFilterPickerStyle}" SelectedDate="{Binding FilterToDate, Mode=TwoWay}"
+                                            Background="{DynamicResource InputBackgroundBrush}"
+                                            Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                            BorderBrush="{DynamicResource ControlBorderBrush}"
+                                            FontSize="12"
+                                            Margin="0,0,0,4"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- 時ドロップダウン -->
+                                    <ComboBox Grid.Column="0" Style="{StaticResource TimeFilterComboBoxStyle}"
+                                              SelectedItem="{Binding FilterToHour, Mode=TwoWay}"
+                                              Background="{DynamicResource InputBackgroundBrush}"
+                                              Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                              BorderBrush="{DynamicResource ControlBorderBrush}"
+                                              AutomationProperties.Name="終了時刻の時" ToolTip="時 (0〜23)">
+                                        <ComboBox.ItemsSource>
+                                            <x:Array Type="sys:Int32">
+                                                <sys:Int32>0</sys:Int32><sys:Int32>1</sys:Int32><sys:Int32>2</sys:Int32><sys:Int32>3</sys:Int32>
+                                                <sys:Int32>4</sys:Int32><sys:Int32>5</sys:Int32><sys:Int32>6</sys:Int32><sys:Int32>7</sys:Int32>
+                                                <sys:Int32>8</sys:Int32><sys:Int32>9</sys:Int32><sys:Int32>10</sys:Int32><sys:Int32>11</sys:Int32>
+                                                <sys:Int32>12</sys:Int32><sys:Int32>13</sys:Int32><sys:Int32>14</sys:Int32><sys:Int32>15</sys:Int32>
+                                                <sys:Int32>16</sys:Int32><sys:Int32>17</sys:Int32><sys:Int32>18</sys:Int32><sys:Int32>19</sys:Int32>
+                                                <sys:Int32>20</sys:Int32><sys:Int32>21</sys:Int32><sys:Int32>22</sys:Int32><sys:Int32>23</sys:Int32>
+                                            </x:Array>
+                                        </ComboBox.ItemsSource>
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Path=., StringFormat='{}{0:00} 時'}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <!-- 分ドロップダウン -->
+                                    <ComboBox Grid.Column="2" Style="{StaticResource TimeFilterComboBoxStyle}"
+                                              SelectedItem="{Binding FilterToMinute, Mode=TwoWay}"
+                                              ItemsSource="{Binding FilterMinuteOptions}"
+                                              Background="{DynamicResource InputBackgroundBrush}"
+                                              Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                              BorderBrush="{DynamicResource ControlBorderBrush}"
+                                              AutomationProperties.Name="終了時刻の分" ToolTip="分 (0〜59、1分刻み)">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate><TextBlock Text="{Binding Path=., StringFormat='{}{0:00} 分'}"/></DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+
+                                <!-- 日時絞り込み適用・解除ボタン -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ui:Button Content="日時を適用" Command="{Binding ApplyDateFilterCommand}" Appearance="Primary" HorizontalAlignment="Stretch" Padding="8,5" Margin="0,0,4,0"/>
+                                    <ui:Button Grid.Column="1" Content="解除" Command="{Binding ClearDateFilterCommand}" Appearance="Secondary" Padding="8,5"/>
+                                </Grid>
+
+
+                                </StackPanel>
+                            </Expander>
+                            <TextBlock Text="ファイルのチェックで表示対象を切り替えます。ファイル名を押すと、そのファイルのログへ移動します。" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,16,0,0" FontSize="12"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                        </Grid>
+            </Border>
+
+            <!-- 左スプリッター -->
+            <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Stretch" Background="{DynamicResource PanelDividerBrush}"
+                          Visibility="{Binding IsLeftPaneOpen, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+            <!-- B. 中央メイン: フルテキスト仮想化ログビューア（一致箇所ハイライト表示 & タッチパン対応） -->
+            <Grid Grid.Column="2" Background="{DynamicResource WindowBackgroundBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- エディタヘッダー / ブレッドクラム -->
+                    <RowDefinition Height="Auto"/> <!-- スクロール中の表示位置 -->
+                    <RowDefinition Height="Auto"/> <!-- 選択行とコピー操作 -->
+                    <RowDefinition Height="*"/>    <!-- 仮想化フルテキストログビューア -->
+                    <RowDefinition Height="Auto"/> <!-- スプリッター (検索結果展開時) -->
+                    <RowDefinition x:Name="SearchResultsPaneRow" Height="180"/> <!-- 検索結果ドロワー (スプリッターで伸縮) -->
+                </Grid.RowDefinitions>
+
+
+                <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,0,0,1" Padding="12,6">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,8,0">
+                            <TextBlock Text="{Binding CurrentViewConditions}" FontSize="12" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentViewConditions}"/>
+                            <TextBlock Text="{Binding SearchFeedbackText}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource SecondaryForegroundBrush}" Visibility="{Binding HasSearchFeedback, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="表示設定 ▾" Padding="8,4" FontSize="12" VerticalAlignment="Top" AutomationProperties.AutomationId="DisplaySettingsMenu">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="ログを折り返す" IsCheckable="True" IsChecked="{Binding WrapLogContent, Mode=TwoWay}"/>
+                                    <MenuItem Header="ファイル名の列を表示" IsCheckable="True" IsChecked="{Binding ShowFileNameColumn, Mode=TwoWay}" IsEnabled="{Binding HasMultipleSources}"/>
+                                    <Separator/>
+                                    <MenuItem Header="連続ログを集約" IsCheckable="True" IsChecked="{Binding IsAggregationEnabled, Mode=TwoWay}"/>
+                                    <MenuItem Header="発生元も一致条件にする" IsCheckable="True" IsChecked="{Binding IncludeSourceInAggregation, Mode=TwoWay}" IsEnabled="{Binding IsAggregationEnabled}"/>
+                                    <Separator/>
+                                    <MenuItem Header="{Binding LogZoomText}" IsEnabled="False"/>
+                                    <MenuItem Header="拡大" Command="{Binding ZoomInLogCommand}" InputGestureText="Ctrl+ホイール↑"/>
+                                    <MenuItem Header="縮小" Command="{Binding ZoomOutLogCommand}" InputGestureText="Ctrl+ホイール↓"/>
+                                    <MenuItem Header="倍率を100%に戻す" Command="{Binding ResetLogZoomCommand}"/>
+                                    <Separator/>
+                                    <MenuItem Header="左ペインを表示" IsCheckable="True" IsChecked="{Binding IsLeftPaneOpen, Mode=TwoWay}"/>
+                                    <MenuItem Header="右ペインを表示" IsCheckable="True" IsChecked="{Binding IsRightPaneOpen, Mode=TwoWay}"/>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </Grid>
+                </Border>
+                <Border Grid.Row="1" Background="{DynamicResource ToolbarBackgroundBrush}" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,0,0,1" Padding="12,4">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding LogViewportText}" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource SecondaryForegroundBrush}"/>
+                            <WrapPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding SelectedLogLineCountText}" FontSize="12" Margin="0,0,8,0" Foreground="{DynamicResource SecondaryForegroundBrush}" ToolTip="Ctrl+クリックまたはShift+クリックで複数行を選択できます"/>
+                                <ProgressBar Value="{Binding LogViewportProgress, Mode=OneWay}" Minimum="0" Maximum="100" Width="60" Height="5" VerticalAlignment="Center" Background="{DynamicResource PanelDividerBrush}" Foreground="{DynamicResource FocusBrush}" AutomationProperties.AutomationId="LogScrollPosition" AutomationProperties.Name="スクロール位置"/>
+                                <TextBlock Text="{Binding LogViewportProgress, StringFormat={}{0:F0}%}" FontSize="12" Margin="6,0,0,0" Foreground="{DynamicResource SecondaryForegroundBrush}" ToolTip="一覧の先頭からのスクロール位置"/>
+                            </WrapPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="4,0" Margin="4,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="行" FontSize="12" VerticalAlignment="Center" Margin="2,0,4,0"/>
+                                    <TextBox Text="{Binding JumpLineText, UpdateSourceTrigger=PropertyChanged}" Width="48" MinHeight="30" Padding="3" KeyDown="OnJumpInputKeyDown" AutomationProperties.Name="移動先の行番号"/>
+                                    <ui:Button Content="移動" Command="{Binding JumpToLineCommand}" Appearance="Transparent" Padding="5,2" ToolTip="選択ファイルの指定行に移動 (Ctrl+G)"/>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel x:Name="LogCopyToolbar" Orientation="Horizontal">
+                            <Button Content="コピー ▾" Padding="8,4" FontSize="12" AutomationProperties.AutomationId="CopyMenu">
+                                <Button.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="選択ログ全文をコピー" Command="{Binding CopySelectedLineCommand}" InputGestureText="Ctrl+C" ToolTip="継続行・スタックトレースを含むイベント全文をコピーします。"/>
+                                        <MenuItem Header="選択行だけコピー（継続行なし）" Command="{Binding CopySelectedVisibleRowsCommand}"/>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border Grid.Row="3" Panel.ZIndex="1" Background="{DynamicResource WindowBackgroundBrush}" Visibility="{Binding ShowStartGuide, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="StartGuide" Margin="24" VerticalAlignment="Center" MaxWidth="440">
+                            <TextBlock Text="ログから調査を始めましょう" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                            <TextBlock Text="1. ログを開く" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="上部の「ログを開く」からファイルを追加します。" FontSize="13" TextWrapping="Wrap" Margin="0,4,0,16"/>
+                            <TextBlock Text="2. 気になるログを探す" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="キーワードを入力してEnter。日時やレベルでも絞り込めます。" FontSize="13" TextWrapping="Wrap" Margin="0,4,0,16"/>
+                            <TextBlock Text="3. 注記する" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="ログを選び、右側の「注記を追加」で気づきを残します。" FontSize="13" TextWrapping="Wrap" Margin="0,4,0,16"/>
+                            <TextBlock Text="4. 調査を保存する" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock Text="「調査を保存」で、ログの組み合わせ・条件・注記を保存します。" FontSize="13" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                        <!-- 列ヘッダーをドラッグして、行番号・ファイル名・本文の幅を調整できます。 -->
+                <DataGrid x:Name="LogListView"
+                          Grid.Row="3"
+                          ItemsSource="{Binding DisplayedLines}"
+                          SelectedItem="{Binding SelectedLogLine, Mode=TwoWay}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserReorderColumns="False"
+                          CanUserResizeColumns="True"
+                          CanUserSortColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Extended"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Vertical"
+                          RowHeaderWidth="0"
+                          Background="{DynamicResource WindowBackgroundBrush}"
+                          Foreground="{DynamicResource PrimaryForegroundBrush}"
+                          BorderThickness="0"
+                          EnableRowVirtualization="True"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.ScrollUnit="Item"
+                          ScrollViewer.CanContentScroll="True"
+                          ScrollViewer.PanningMode="Both"
+                          ScrollViewer.PanningDeceleration="0.002"
+                          ScrollViewer.PanningRatio="1"
+                          ScrollViewer.IsDeferredScrollingEnabled="False"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          FontFamily="{DynamicResource MonospaceFontFamily}"
+                          FontSize="{Binding LogFontSize}">
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="{DynamicResource ToolbarBackgroundBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource SecondaryForegroundBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}"/>
+                            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                            <Setter Property="Padding" Value="6,4"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        </Style>
+                        <Style x:Key="LogDataGridCellStyle" TargetType="DataGridCell">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}"/>
+                            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Resources>
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="{Binding MarkBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource PrimaryForegroundBrush}"/>
+                            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}"/>
+                            <Setter Property="Tag" Value="{Binding DataContext, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                            <Setter Property="ContextMenu">
+                                <Setter.Value>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="ログ単位に色付け">
+                                            <MenuItem Header="黄" Command="{Binding MarkLogCommand}" CommandParameter="Yellow"/>
+                                            <MenuItem Header="赤" Command="{Binding MarkLogCommand}" CommandParameter="Red"/>
+                                            <MenuItem Header="緑" Command="{Binding MarkLogCommand}" CommandParameter="Green"/>
+                                            <MenuItem Header="青" Command="{Binding MarkLogCommand}" CommandParameter="Blue"/>
+                                            <MenuItem Header="紫" Command="{Binding MarkLogCommand}" CommandParameter="Purple"/>
+                                            <Separator/>
+                                            <MenuItem Header="色を解除" Command="{Binding MarkLogCommand}" CommandParameter="Clear"/>
+                                        </MenuItem>
+                                        <MenuItem Header="お気に入りに登録 / 解除"
+                                                  Command="{Binding ToggleFavoriteCommand}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
+                                        <MenuItem Header="この行に注記を追加"
+                                                  Command="{Binding BeginAnnotationCommand}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                        <Separator/>
+                                        <MenuItem Header="{Binding PlacementTarget.DataContext.AggregationActionText, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Visibility="{Binding PlacementTarget.DataContext.CanToggleAggregation, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                  Command="{Binding ToggleAggregateGroupCommand}"
+                                                  CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    </ContextMenu>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsInSelectedEvent}" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource HighlightBackgroundBrush}"/>
+                                </DataTrigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource SelectionBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="☆" Width="34" CellStyle="{StaticResource LogDataGridCellStyle}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding DataContext.ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"
+                                            IsEnabled="{Binding IsFavoriteToggleEnabled}"
+                                            ToolTip="{Binding FavoriteToolTip}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="2,0"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding FavoriteSymbol}" HorizontalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource SecondaryForegroundBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                        <Setter Property="Foreground" Value="#FFFFD54F"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="行番号" Width="68" CellStyle="{StaticResource LogDataGridCellStyle}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding LineNumber}"
+                                               Foreground="{DynamicResource LineNumberForegroundBrush}"
+                                               TextAlignment="Right"
+                                               Padding="0,2,6,2"
+                                               VerticalAlignment="Top"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="ファイル名" Width="180" CellStyle="{StaticResource LogDataGridCellStyle}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Source.DisplayName}"
+                                               ToolTip="{Binding Source.FilePath}"
+                                               Foreground="{DynamicResource InfoBadgeBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Padding="6,2,4,2"
+                                               VerticalAlignment="Top"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="ログ内容" Width="*" CellStyle="{StaticResource LogDataGridCellStyle}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="22"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Width="3" HorizontalAlignment="Left"
+                                                Background="{DynamicResource FocusBrush}"
+                                                Visibility="{Binding IsInSelectedEvent, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <TextBlock Grid.Column="0" Text="↳"
+                                                   Foreground="{DynamicResource FocusBrush}"
+                                                   FontWeight="Bold"
+                                                   Padding="6,2,0,2"
+                                                   VerticalAlignment="Top"
+                                                   Visibility="{Binding IsContinuation, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <Border Grid.Column="1" Background="{DynamicResource HighlightBackgroundBrush}" CornerRadius="3" Margin="0,1,4,0" Padding="4,1" VerticalAlignment="Top"
+                                                Visibility="{Binding IsAggregatedGroup, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding AggregationSummary}" FontSize="12" Foreground="{DynamicResource FocusBrush}" FontWeight="SemiBold"/>
+                                        </Border>
+                                        <controls:HighlightTextBlock Grid.Column="2"
+                                                                   HighlightText="{Binding Text}"
+                                                                   HighlightQuery="{Binding DataContext.SearchText, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                   Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                                                   Padding="6,2,8,2"
+                                                                   VerticalAlignment="Top">
+                                            <controls:HighlightTextBlock.Style>
+                                                <Style TargetType="{x:Type controls:HighlightTextBlock}">
+                                                    <Setter Property="TextWrapping" Value="Wrap"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding DataContext.WrapLogContent, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False">
+                                                            <Setter Property="TextWrapping" Value="NoWrap"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </controls:HighlightTextBlock.Style>
+                                        </controls:HighlightTextBlock>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 検索結果パネル (検索結果が存在するときに表示) -->
+                <GridSplitter Grid.Row="4" Height="3" HorizontalAlignment="Stretch" Background="{DynamicResource PanelDividerBrush}"
+                              Visibility="{Binding HasSearchResults, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                <Border Grid.Row="5"
+                        Background="{DynamicResource PanelBackgroundBrush}"
+                        BorderBrush="{DynamicResource PanelDividerBrush}"
+                        BorderThickness="0,1,0,0"
+                        Visibility="{Binding HasSearchResults, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <!-- 検索結果ヘッダー -->
+                        <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" Padding="10,6" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <ui:SymbolIcon Symbol="Search24" FontSize="14" Foreground="{DynamicResource InfoBadgeBrush}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="検索結果一覧" FontWeight="SemiBold" FontSize="12"/>
+                                    <Border Background="{DynamicResource InfoBadgeBrush}" CornerRadius="8" Padding="6,1" Margin="8,0,0,0">
+                                        <TextBlock Text="{Binding SearchResults.Count, StringFormat={}{0:N0} 件}" FontSize="12" Foreground="White" FontWeight="Bold"/>
+                                    </Border>
+                                </StackPanel>
+                                <ui:Button Command="{Binding ClearSearchCommand}" Appearance="Transparent" HorizontalAlignment="Right" Padding="6,2" ToolTip="結果を閉じる">
+                                    <ui:SymbolIcon Symbol="Dismiss24" FontSize="14"/>
+                                </ui:Button>
+                            </Grid>
+                        </Border>
+                        <!-- 検索結果一覧リスト (プレビューもハイライト対応) -->
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding SearchResults}"
+                                 SelectedItem="{Binding SelectedSearchResultItem, Mode=TwoWay}"
+                                 ItemContainerStyle="{StaticResource SearchHitItemStyle}"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="190"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding DisplayText}" FontWeight="SemiBold" Foreground="{DynamicResource InfoBadgeBrush}" VerticalAlignment="Center"/>
+                                        <controls:HighlightTextBlock Grid.Column="1"
+                                                                    HighlightText="{Binding Preview}"
+                                                                   HighlightQuery="{Binding DataContext.SearchText, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                                   Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   VerticalAlignment="Center"
+                                                                   FontFamily="{DynamicResource MonospaceFontFamily}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 右スプリッター -->
+            <GridSplitter Grid.Column="3" Width="3" HorizontalAlignment="Stretch" Background="{DynamicResource PanelDividerBrush}"
+                          Visibility="{Binding IsRightPaneOpen, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+
+            <!-- Detail and annotations share space without competing for height. -->
+            <Border Grid.Column="4" Visibility="{Binding IsRightPaneOpen, Converter={StaticResource BoolToVisibilityConverter}}" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <ui:Button Content="注記を追加" Command="{Binding BeginAnnotationCommand}" CommandParameter="{Binding SelectedLogLine}" Appearance="Secondary" Padding="10,5" Margin="10,8" HorizontalAlignment="Right"/>
+                    <TabControl x:Name="RightPaneTabs" Grid.Row="1" SelectedIndex="{Binding RightPaneTabIndex, Mode=TwoWay}" Background="{DynamicResource PanelBackgroundBrush}" BorderThickness="0" Foreground="{DynamicResource PrimaryForegroundBrush}">
+                        <TabItem Header="ログ詳細" FontSize="12" Background="{DynamicResource PanelBackgroundBrush}" Foreground="{DynamicResource PrimaryForegroundBrush}">
+                            <Grid Margin="12">
+                                <TextBlock Text="ログ一覧で行を選ぶと、ログの全文をここに表示します。" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,12" Visibility="{Binding ShowSelectionGuide, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                <Grid Visibility="{Binding HasSelectedLog, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding SelectedLogLocationText}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <StackPanel Grid.Row="1" Margin="0,0,0,10">
+                                        <ToggleButton Content="JSON構造" IsChecked="{Binding IsJsonViewMode, Mode=TwoWay}" IsEnabled="{Binding IsSelectedLogJson}" FontSize="12" Padding="8,4" ToolTip="JSONを含むログの構造を整形表示します。"/>
+                                        <TextBlock Text="範囲選択してCtrl+Cでコピー" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <Grid>
+                                            <controls:SelectableHighlightTextBox HighlightText="{Binding SelectedEventFullText}" HighlightQuery="{Binding SearchText}" Foreground="{DynamicResource PrimaryForegroundBrush}" FontFamily="{DynamicResource MonospaceFontFamily}" FontSize="12" Visibility="{Binding ShowRawPreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <controls:SelectableHighlightTextBox HighlightText="{Binding SelectedJsonFormattedText}" HighlightQuery="{Binding SearchText}" Foreground="{DynamicResource PrimaryForegroundBrush}" FontFamily="{DynamicResource MonospaceFontFamily}" FontSize="12" Visibility="{Binding IsJsonViewActive, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </Grid>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="{Binding AnnotationTabTitle}" FontSize="12" Background="{DynamicResource PanelBackgroundBrush}" Foreground="{DynamicResource PrimaryForegroundBrush}">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                                    <ListBox Grid.Row="0"
+                             ItemsSource="{Binding Annotations}"
+                             SelectedItem="{Binding SelectedAnnotation, Mode=TwoWay}"
+                             SelectionChanged="OnAnnotationSelected"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             Padding="6">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SubPanelBackgroundBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="2,4">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding DisplayText}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <Button Grid.Column="1" Content="ジャンプ" FontSize="12" Padding="8,4" MinHeight="30" VerticalAlignment="Top"
+                                                    Command="{Binding DataContext.JumpToAnnotationCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}" ToolTip="注記を付けた元のログ行へ移動します"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource PrimaryForegroundBrush}" Margin="0,5,0,0"/>
+                                        <TextBlock Text="{Binding Comment}" FontSize="12" Foreground="{DynamicResource SecondaryForegroundBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+
+                                <TextBlock Text="注記はまだありません。ログを選び、「注記を追加」で気づきを残せます。" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="12,16" VerticalAlignment="Top" Visibility="{Binding HasNoAnnotations, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                <Border x:Name="AnnotationEntryPanel" Grid.Row="1" Padding="12" BorderBrush="{DynamicResource PanelDividerBrush}" BorderThickness="0,1,0,0" Visibility="{Binding IsAnnotationEntryOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,6">
+                                            <Button DockPanel.Dock="Right" Content="閉じる" Command="{Binding CloseAnnotationEntryCommand}" Padding="6,2" FontSize="12"/>
+                                            <TextBlock Text="注記を追加" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding AnnotationTargetText}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SecondaryForegroundBrush}"/>
+                                        <ui:TextBox Text="{Binding NewAnnotationTitle, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="タイトル（例: タイムアウト発生箇所）" MinHeight="36" Padding="8,5" VerticalContentAlignment="Center" AutomationProperties.AutomationId="NewAnnotationTitle" AutomationProperties.Name="注記のタイトル" Margin="0,0,0,6"/>
+                                        <ui:TextBox Text="{Binding NewAnnotationComment, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="気づき・原因の仮説など（Enterで改行）" AcceptsReturn="True" Height="96" Padding="8,6" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" AutomationProperties.AutomationId="NewAnnotationComment" AutomationProperties.Name="注記のコメント" Margin="0,0,0,8" TextWrapping="Wrap"/>
+                                        <ui:Button Content="注記を追加" Command="{Binding AddAnnotationCommand}" Appearance="Primary" HorizontalAlignment="Stretch" Padding="10,6"/>
+                                        <TextBlock Text="追加後は「調査を保存」で保存してください。" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryForegroundBrush}" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border x:Name="InvestigationGuide" Grid.Row="2" Panel.ZIndex="20" HorizontalAlignment="Right" Width="500" Margin="12" Background="{DynamicResource PanelBackgroundBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="18" Visibility="{Binding IsHelpOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <DockPanel Margin="0,0,0,12">
+                    <Button DockPanel.Dock="Right" Content="閉じる" Command="{Binding CloseHelpCommand}" Padding="10,4"/>
+                    <TextBlock Text="LogScopeの使い方" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </DockPanel>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel TextElement.FontSize="13">
+                        <TextBlock Text="ログを開く → 探す → 注記する → 調査を保存" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                        <Expander x:Name="InvestigationGuideDetails" Header="使い方と保存内容" IsExpanded="True" HorizontalContentAlignment="Stretch">
+                            <StackPanel Margin="0,12,0,0">
+                                <TextBlock Text="1. 「ログを開く」でファイルを追加します。左のチェックで表示対象を選び、ファイル名でそのログへ移動します。「☆のみ」はそのファイルのお気に入りだけを表示します。" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <TextBlock Text="2. キーワードを入力してEnterで検索します。通常は前後のログを残して強調表示。「検索設定」の「一致行のみ表示」で一致行に絞れます。AND・OR・NOT・括弧、正規表現にも対応しています。日時は「日時を適用」で、レベルは変更すると反映されます。" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <TextBlock Text="3. 行を選び「注記を追加」でタイトルやコメントを入力し、フォームの「注記を追加」を押します。登録した注記の「ジャンプ」で元の行へ戻れます。" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <TextBlock Text="4. 「調査を保存」（Ctrl+S）でログの組み合わせ・検索条件・注記を保存します。次回は「調査 ▾」の「調査を開く」から再開できます。「調査情報を編集」で原因・対応・結論も記録できます。" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <TextBlock Text="注記の追加後も調査の保存が必要です。「未保存」はまだ保存していない変更です。ログ本文は保存しないため、再開時にも元のログファイルが必要です。お気に入りは別途保存され、色付けは開いている間だけ保持されます。" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryForegroundBrush}"/>
+                            </StackPanel>
+                        </Expander>
+                        <TextBlock Text="ショートカット" FontWeight="SemiBold" Margin="0,20,0,8"/>
+                        <TextBlock Text="Ctrl+O: ログを開く&#x0a;Ctrl+F: 検索欄へ移動 / Enter: 検索&#x0a;Ctrl+S: 調査を保存 / Ctrl+G: 行移動&#x0a;Esc: 検索をクリア&#x0a;Ctrl+C: 選択ログ全文をコピー（ログ一覧）&#x0a;Ctrl+ホイール: 倍率変更 / Shift+ホイール: 横スクロール&#x0a;右クリック: 色付け・お気に入り・注記・集約" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+                <!-- 4. VS Code風 ステータスバー -->
+        <Border Grid.Row="3" Background="{DynamicResource StatusBarBackgroundBrush}">
+            <Grid TextElement.Foreground="{DynamicResource StatusBarForegroundBrush}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Column="0" Margin="8,0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:SymbolIcon Grid.Column="0" Symbol="Info24" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" FontSize="12" VerticalAlignment="Center"/>
+                    <Border Grid.Column="2" Background="{DynamicResource FocusBrush}" CornerRadius="4" Padding="6,1" Margin="10,0,6,0"
+                            Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="処理中" FontSize="12" Foreground="White" FontWeight="SemiBold"/>
+                    </Border>
+                    <ProgressBar Grid.Column="3" IsIndeterminate="{Binding IsProgressIndeterminate}" Value="{Binding ProgressValue, Mode=OneWay}"
+                                 Minimum="0" Maximum="100" Width="100" Height="12" Margin="0,0,8,0"
+                                 Visibility="{Binding IsProcessing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <TextBlock Grid.Column="4" Text="{Binding ProgressValue, StringFormat={}{0:F0}%}" FontSize="12" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsProcessing}" Value="True"/>
+                                            <Condition Binding="{Binding IsProgressIndeterminate}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+                <StackPanel Grid.Column="1" Margin="8,0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SelectedEventSummary}" FontSize="12" Margin="0,0,12,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</local:AppWindow>
